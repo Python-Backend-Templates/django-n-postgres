@@ -1,0 +1,20 @@
+[flake8]
+exclude =
+    .venv
+    .pypy_cache
+    .pytest_cache
+    locale
+    migrations
+    .coverage
+    entrypoint.sh
+    Dockerfile*
+    .env
+    .env.example
+max-line-length = 88
+per-file-ignores = 
+    __init__.py:F401
+    *di/dev.py:F405,F403
+    *di/test.py:F405,F403
+    *schema.py:E501
+    *utils.py:E501
+    *test_*.py:E501,F401

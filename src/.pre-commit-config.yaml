@@ -1,0 +1,19 @@
+repos:
+- repo: https://github.com/PyCQA/flake8
+  rev: 7.1.0
+  hooks:
+  - id: flake8
+    args: ["--config", "src/.flake8"]
+    stages: [push]
+- repo: https://github.com/psf/black
+  rev: 24.4.2
+  hooks:
+  - id: black
+    args: ["--config", "src/pyproject.toml"]
+    stages: [push]
+- repo: https://github.com/pycqa/isort
+  rev: 5.13.2
+  hooks:
+  - id: isort
+    args: ["--profile", "black", "--filter-files"]
+    stages: [push]

@@ -1,0 +1,125 @@
+networks:
+  network:
+    name: ${PROJECT_NAME}_network
+
+services:
+  db:
+    container_name: ${PROJECT_NAME}-db
+    image: postgres:14.5-alpine
+    volumes:
+      - db_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_PORT: ${DB_PORT}
+    networks:
+      - network
+    expose:
+      - ${DB_PORT}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -p $$POSTGRES_PORT -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: ${PROJECT_NAME}-redis
+    image: redis:7.4-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - network
+    restart: unless-stopped
+
+  wsgi:
+    container_name: ${PROJECT_NAME}-wsgi
+    build:
+      context: ./src/
+      dockerfile: Dockerfile.local
+    env_file:
+      - .env
+    volumes:
+      - ./src/:/apps/
+      - ${STATIC_PATH}:/static
+      - ${MEDIA_PATH}:/media
+      - ${LOG_PATH}:/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    ports:
+      - "${WSGI_PORT}:${WSGI_PORT}"
+    networks:
+      - network
+    restart: unless-stopped
+
+  rabbitmq:
+    container_name: ${PROJECT_NAME}-rabbitmq
+    image: rabbitmq:3.13-management
+    hostname: ${PROJECT_NAME}-rabbitmq-node  # This is required for rabbitmq to restore data after restart
+    expose:
+      - ${RABBITMQ_PORT}
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - network
+    restart: unless-stopped
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 3
+
+  celery_worker:
+    container_name: ${PROJECT_NAME}-celery-worker
+    build:
+      context: ./src/
+      dockerfile: Dockerfile.celery
+    command: sh -c "python -m celery -A config worker -l debug"
+    depends_on:
+      - wsgi
+    env_file:
+      - .env
+    volumes:
+      - ./src/:/apps/
+      - ${STATIC_PATH}:/static
+      - ${MEDIA_PATH}:/media
+      - ${LOG_PATH}:/logs
+    networks:
+      - network
+    restart: unless-stopped
+
+  flower:
+    container_name: ${PROJECT_NAME}-flower
+    image: mher/flower:2.0
+    environment:
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      FLOWER_PORT: ${FLOWER_PORT}
+      FLOWER_BASIC_AUTH: ${FLOWER_LOGIN}:${FLOWER_PASSWORD}
+      FLOWER_URL_PREFIX: ${FLOWER_URL_PREFIX}
+    depends_on:
+      - celery_worker
+    env_file:
+      - .env
+    ports:
+      - "${FLOWER_PORT}:${FLOWER_PORT}"
+    networks:
+      - network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    name: ${PROJECT_NAME}_db_data
+  rabbitmq_data:
+    name: ${PROJECT_NAME}_rabbitmq_data
+  redis_data:
+    name: ${PROJECT_NAME}_redis_data
