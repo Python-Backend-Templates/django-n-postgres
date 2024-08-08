@@ -28,10 +28,11 @@ ENV PYTHONUNBUFFERED 1 \
 RUN mkdir /apps/
 WORKDIR /apps/
 
-ENV VIRTUAL_ENV=/apps/.venv \
+ENV VIRTUAL_ENV_BUILDER=/apps/.venv \
+    VIRTUAL_ENV_RUNTIME=/apps/.venv \
     PATH="/apps/.venv/bin:$PATH"
 
-COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
+COPY --from=builder ${VIRTUAL_ENV_BUILDER} ${VIRTUAL_ENV_RUNTIME}
 COPY ./. ./
 
 ENTRYPOINT ["bash", "entrypoint.sh"]
