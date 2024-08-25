@@ -42,6 +42,7 @@ services:
       - .env
     volumes:
       - ./src/:/apps/
+      - /apps/.venv  # prevents dependency errors
       - ${STATIC_PATH}:/static
       - ${MEDIA_PATH}:/media
       - ${LOG_PATH}:/logs
@@ -83,13 +84,13 @@ services:
     build:
       context: ./src/
       dockerfile: Dockerfile.celery
-    command: sh -c "python -m celery -A config worker -l debug"
     depends_on:
       - wsgi
     env_file:
       - .env
     volumes:
       - ./src/:/apps/
+      - /apps/.venv  # prevents dependency errors
       - ${STATIC_PATH}:/static
       - ${MEDIA_PATH}:/media
       - ${LOG_PATH}:/logs

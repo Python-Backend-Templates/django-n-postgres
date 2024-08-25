@@ -4,14 +4,31 @@ from pathlib import Path
 
 from celery import Celery, signals
 from django.conf import settings
+from opentelemetry import trace
+
+from jaeger import init_jaeger
 
 from . import config
+
+
+@signals.worker_process_init.connect(weak=False)
+def init_celery_tracing(*args, **kwargs):
+    init_jaeger()
+
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 app = Celery("config")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
+
+tracer = trace.get_tracer(__name__)
+
+
+@app.task
+@tracer.start_as_current_span("celery_ping")
+def ping() -> str:
+    return "pong"
 
 
 @signals.setup_logging.connect

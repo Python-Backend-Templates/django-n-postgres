@@ -3,11 +3,16 @@
 import os
 import sys
 
+from jaeger import init_jaeger
 
 
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
+    if not bool(int(os.environ.get("IN_GUNICORN", 1))):
+        init_jaeger()
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
