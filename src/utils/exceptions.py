@@ -1,12 +1,18 @@
-from typing import Any, Dict
+import logging
+import math
+import traceback
+from typing import Dict
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
+from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from rest_framework import exceptions, status
 from rest_framework.response import Response
+
+http_logger = logging.getLogger("http")
 
 
 class CustomException(Exception):
@@ -16,11 +22,11 @@ class CustomException(Exception):
     def __init__(self, detail: StrOrPromise | None = None):
         self.detail = detail if detail else self._detail
 
-    def get_data(self):
+    def get_data(self) -> Dict[str, str]:
         return {"detail": self.detail}
 
     @classmethod
-    def get_status(cls):
+    def get_status(cls) -> int:
         return cls._status
 
 
@@ -36,12 +42,46 @@ class Custom500Exception(CustomException):
     _status = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
-def custom_exception_handler(exc, context) -> Response | None:
+class CustomThrottledException(exceptions.APIException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    default_detail = _("Request was throttled.")
+    default_code = "throttled"
+    extra_detail_1 = _("Ожидается доступность через {wait} секунду.")
+    extra_detail_2 = _("Ожидается доступность через {wait} секунды.")
+    extra_detail_3 = _("Ожидается доступность через {wait} секунд.")
+
+    def __init__(
+        self,
+        wait: int | None = None,
+        detail: StrOrPromise | None = None,
+        code: int | None = None,
+    ):
+        if detail is None:
+            detail = force_str(self.default_detail)
+        if wait is not None:
+            wait = math.ceil(wait)
+            if wait % 10 == 1 and wait // 10 != 1:
+                extra_detail = self.extra_detail_1
+            elif wait % 10 in (2, 3, 4) and wait // 10 != 1:
+                extra_detail = self.extra_detail_2
+            else:
+                extra_detail = self.extra_detail_3
+            detail = " ".join(
+                (
+                    detail,
+                    force_str(extra_detail.format(wait=wait)),
+                )
+            )
+        self.wait = wait
+        super().__init__(detail, code)
+
+
+def custom_exception_handler(exc: Exception, context: Dict) -> Response | None:
     return ExceptionHandler(exc, context).run()
 
 
 class ExceptionHandler:
-    def __init__(self, exc: Exception, context: Any) -> None:
+    def __init__(self, exc: Exception, context: Dict) -> None:
         self.exc = exc
         self.context = context
 
@@ -58,6 +98,7 @@ class ExceptionHandler:
         exc = self._unhandled_to_drf(exc)
         data = self._format(exc)
         headers = self._get_headers(exc)
+        self._log(exc, data, headers)
         return self._get_response(exc, data, headers)
 
     def _should_not_handle(self, exc: Exception) -> bool:
@@ -95,6 +136,14 @@ class ExceptionHandler:
             detail = _("Произошла внутренняя ошибка. Пожалуйста, попробуйте позже.")
         else:
             detail = exc.detail
+
+        if isinstance(exc, exceptions.Throttled):
+            detail = CustomThrottledException(
+                wait=exc.wait,
+                detail=None,
+                code=exc.status_code,
+            ).detail
+
         return {"detail": detail}
 
     def _get_headers(self, exc: exceptions.APIException) -> Dict:
@@ -104,6 +153,22 @@ class ExceptionHandler:
         if getattr(exc, "wait", None):
             headers["Retry-After"] = "%d" % exc.wait
         return headers
+
+    def _log(self, exc: exceptions.APIException, data: Dict, headers: Dict) -> None:
+        if settings.DEBUG:
+            return
+        extra = {"data": data, "headers": headers}
+        if exc.status_code != status.HTTP_500_INTERNAL_SERVER_ERROR:
+            http_logger.error("", extra=extra)
+            return
+        http_logger.critical(
+            "",
+            extra={
+                **extra,
+                "exception_message": traceback.format_exception_only(type(exc), exc),
+                "exception_traceback": traceback.format_exc(),
+            },
+        )
 
     def _get_response(
         self, exc: exceptions.APIException, data: Dict, headers: Dict

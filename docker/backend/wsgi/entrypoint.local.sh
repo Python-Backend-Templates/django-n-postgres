@@ -9,7 +9,11 @@ set -o pipefail
 # exits if any of variables is not set
 set -o nounset
 
-mkdir -p /var/run/celery /var/log/celery
-chown -R nobody:nogroup /var/run/celery /var/log/celery
+echo "[MIGRATE]"
+python manage.py migrate --no-input
 
-python -m celery -A config worker -l debug --uid=nobody --gid=nogroup
+echo "[COLLECT STATIC]"
+python manage.py collectstatic --no-input
+
+echo "[RUN SERVER]"
+python manage.py runserver 0.0.0.0:8000

@@ -29,6 +29,17 @@ files = [
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 
 [[package]]
+name = "async-timeout"
+version = "5.0.1"
+description = "Timeout context manager for asyncio programs"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
+    {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
+]
+
+[[package]]
 name = "attrs"
 version = "24.2.0"
 description = "Classes Without Boilerplate"
@@ -601,6 +612,39 @@ files = [
 [package.dependencies]
 celery = ">=5.2.7,<6.0"
 Django = ">=3.2.18"
+
+[[package]]
+name = "django-cors-headers"
+version = "4.6.0"
+description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "django_cors_headers-4.6.0-py3-none-any.whl", hash = "sha256:8edbc0497e611c24d5150e0055d3b178c6534b8ed826fb6f53b21c63f5d48ba3"},
+    {file = "django_cors_headers-4.6.0.tar.gz", hash = "sha256:14d76b4b4c8d39375baeddd89e4f08899051eeaf177cb02a29bd6eae8cf63aa8"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6"
+django = ">=4.2"
+
+[[package]]
+name = "django-redis"
+version = "5.4.0"
+description = "Full featured redis cache backend for Django."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "django-redis-5.4.0.tar.gz", hash = "sha256:6a02abaa34b0fea8bf9b707d2c363ab6adc7409950b2db93602e6cb292818c42"},
+    {file = "django_redis-5.4.0-py3-none-any.whl", hash = "sha256:ebc88df7da810732e2af9987f7f426c96204bf89319df4c6da6ca9a2942edd5b"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+redis = ">=3,<4.0.0 || >4.0.0,<4.0.1 || >4.0.1"
+
+[package.extras]
+hiredis = ["redis[hiredis] (>=3,!=4.0.0,!=4.0.1)"]
 
 [[package]]
 name = "django-stubs"
@@ -1773,6 +1817,24 @@ files = [
 ]
 
 [[package]]
+name = "redis"
+version = "5.2.0"
+description = "Python client for Redis database and key-value store"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "redis-5.2.0-py3-none-any.whl", hash = "sha256:ae174f2bb3b1bf2b09d54bf3e51fbc1469cf6c10aa03e21141f51969801a7897"},
+    {file = "redis-5.2.0.tar.gz", hash = "sha256:0b1087665a771b1ff2e003aa5bdd354f15a70c9e25d5a7dbf9c722c16528a7b0"},
+]
+
+[package.dependencies]
+async-timeout = {version = ">=4.0.3", markers = "python_full_version < \"3.11.3\""}
+
+[package.extras]
+hiredis = ["hiredis (>=3.0.0)"]
+ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==23.2.1)", "requests (>=2.31.0)"]
+
+[[package]]
 name = "referencing"
 version = "0.35.1"
 description = "JSON Referencing + Python"
@@ -2162,4 +2224,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "52c693775b0c23924fd9d0c2e6e12a47bd65d6e42d5572390afb9208f8aecd61"
+content-hash = "3f7ea2034d7bdefc6081a9376ecf78888a3dfb6bf06ab2330a2ad2c5d39b72b6"

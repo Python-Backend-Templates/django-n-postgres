@@ -1,0 +1,39 @@
+services:
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+    image: ${REGISTRY}/nginx:${CI_COMMIT_TAG:-latest}
+
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  rabbitmq:
+    extends:
+      file: docker-compose.yml
+      service: rabbitmq
+
+  wsgi:
+    extends:
+      file: docker-compose.yml
+      service: wsgi
+    image: ${REGISTRY}/wsgi:${CI_COMMIT_TAG:-latest}
+
+  celery-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    image: ${REGISTRY}/worker:${CI_COMMIT_TAG:-latest}
+
+  celery-beat:
+    extends:
+      file: docker-compose.yml
+      service: celery-beat
+    image: ${REGISTRY}/beat:${CI_COMMIT_TAG:-latest}

@@ -37,6 +37,7 @@ def on_celery_setup_logging(**kwargs):
         Path(settings.LOG_PATH + "celery").mkdir(parents=False, exist_ok=True)
     except (FileExistsError, FileNotFoundError):
         pass
+
     config_ = {
         "version": 1,
         "disable_existing_loggers": False,

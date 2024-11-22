@@ -12,3 +12,10 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class SoftDeleteModel(models.Model):
+    is_deleted = models.BooleanField(_("Удален"), default=False)
+
+    class Meta:
+        abstract = True

@@ -1,22 +1,23 @@
 import functools
-from typing import TypeVar
+from typing import Any, Callable, Type, TypeVar
 
-from django.db.models import Model
+from django.db.models import Model, QuerySet
+from django.views import View
 
-T = TypeVar("T", bound=Model)
+TModel = TypeVar("TModel", bound=Model)
 
 
-def swagger_safe(model: T):
+def swagger_safe(model: Type[TModel]) -> Callable:
     """
     Декоратор, который предотвращает запросы к базе данных при генерации документации.
     Используется для метода `get_queryset`.
     """
 
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self: View, *args: Any, **kwargs: Any) -> QuerySet[TModel]:
             if getattr(self, "swagger_fake_view", False):
-                return model.objects.none()
+                return model.objects.none()  # type: ignore[attr-defined]
             return func(self, *args, **kwargs)
 
         return wrapper

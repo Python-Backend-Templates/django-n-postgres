@@ -1,0 +1,184 @@
+networks:
+  network:
+    name: ${PROJECT_NAME}-network
+
+volumes:
+  db-data:
+    name: ${PROJECT_NAME}-db-data
+  redis-data:
+    name: ${PROJECT_NAME}-redis-data
+  rabbitmq-data:
+    name: ${PROJECT_NAME}-rabbitmq-data
+
+services:
+  nginx:
+    container_name: ${PROJECT_NAME}-nginx
+    build:
+      context: ../
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        NGINX_VERSION: ${NGINX_VERSION}
+    ports:
+      - ${NGINX_OUTER_PORT}:${NGINX_INNER_PORT}
+    volumes:
+      - ${STATIC_PATH}:/static
+      - ${MEDIA_PATH}:/media
+    depends_on:
+      - wsgi
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    cpus: ${NGINX_CPUS:-0.000}
+    mem_limit: ${NGINX_MEM_LIMIT:-1G}
+    mem_reservation: ${NGINX_MEM_RESERVATION:-500M}
+
+  db:
+    container_name: ${PROJECT_NAME}-db
+    image: postgres:${POSTGRES_VERSION}
+    command: -c config_file=/etc/postgresql.conf
+    volumes:
+      - ../postgresql/postgresql.conf:/etc/postgresql.conf
+      - ../postgresql/pg_hba.conf:/etc/pg_hba.conf
+      - db-data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_PORT: ${DB_PORT}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    networks:
+      - network
+    expose:
+      - ${DB_PORT}
+    restart: ${RESTART_POLICY:-unless-stopped}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -p $$POSTGRES_PORT"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    cpus: ${DB_CPUS:-0.000}
+    mem_limit: ${DB_MEM_LIMIT:-1G}
+    mem_reservation: ${DB_MEM_RESERVATION:-500M}
+
+  redis:
+    container_name: ${PROJECT_NAME}-redis
+    image: redis:${REDIS_VERSION}
+    command:
+      - "--requirepass ${REDIS_PASSWORD}"
+    volumes:
+      - redis-data:/data
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    cpus: ${REDIS_CPUS:-0.000}
+    mem_limit: ${REDIS_MEM_LIMIT:-1G}
+    mem_reservation: ${REDIS_MEM_RESERVATION:-500M}
+
+  rabbitmq:
+    container_name: ${PROJECT_NAME}-rabbitmq
+    image: rabbitmq:${RABBITMQ_VERSION}
+    hostname: ${PROJECT_NAME}
+    expose:
+      - ${RABBITMQ_PORT}
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ../rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    cpus: ${RABBITMQ_CPUS:-0.000}
+    mem_limit: ${RABBITMQ_MEM_LIMIT:-1G}
+    mem_reservation: ${RABBITMQ_MEM_RESERVATION:-500M}
+
+  wsgi:
+    container_name: ${PROJECT_NAME}-wsgi
+    build:
+      context: ../
+      dockerfile: docker/backend/Dockerfile
+      target: ${WSGI_TARGET}
+    env_file:
+      - .env
+    volumes:
+      - ${STATIC_PATH}:/static
+      - ${MEDIA_PATH}:/media
+      - ${LOG_PATH}:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    expose:
+      - ${WSGI_PORT}
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    cpus: ${WSGI_CPUS:-0.000}
+    mem_limit: ${WSGI_MEM_LIMIT:-1G}
+    mem_reservation: ${WSGI_MEM_RESERVATION:-500M}
+
+  celery-worker:
+    container_name: ${PROJECT_NAME}-celery-worker
+    build:
+      context: ../
+      dockerfile: docker/backend/Dockerfile
+      target: ${CELERY_TARGET}
+    depends_on:
+      - wsgi
+    env_file:
+      - .env
+    volumes:
+      - ${MEDIA_PATH}:/media
+      - ${LOG_PATH}:/logs
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    healthcheck:
+      test: celery -A config inspect ping
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    cpus: ${CELERY_CPUS:-0.000}
+    mem_limit: ${CELERY_MEM_LIMIT:-1G}
+    mem_reservation: ${CELERY_MEM_RESERVATION:-500M}
+
+  celery-beat:
+    container_name: ${PROJECT_NAME}-celery-beat
+    build:
+      context: ../
+      dockerfile: docker/backend/Dockerfile
+      target: ${BEAT_TARGET}
+    depends_on:
+      celery-worker:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ${LOG_PATH}:/logs
+    networks:
+      - network
+    restart: ${RESTART_POLICY:-unless-stopped}
+    healthcheck:
+      test: celery -A config inspect ping
+      interval: 15s
+      timeout: 20s
+      retries: 3
+    cpus: ${BEAT_CPUS:-0.000}
+    mem_limit: ${BEAT_MEM_LIMIT:-1G}
+    mem_reservation: ${BEAT_MEM_RESERVATION:-500M}

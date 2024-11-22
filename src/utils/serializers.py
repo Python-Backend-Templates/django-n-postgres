@@ -26,6 +26,18 @@ class Forbidden403Serializer(serializers.Serializer):
     detail = serializers.CharField()
 
 
+class TooManyRequests429Serializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
+internal_error_serializer = inline_serializer(
+    name="InternalError",
+    fields={
+        "detail": serializers.CharField(),
+    },
+)
+
+
 class PaginationParametersSerializer(serializers.Serializer):
     page_size = serializers.IntegerField(required=False)
     page = serializers.IntegerField(required=False)

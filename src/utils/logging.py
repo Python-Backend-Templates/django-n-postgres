@@ -8,7 +8,7 @@ from config import config
 
 
 class JsonLogFormatter(VerboseJSONFormatter):
-    def to_json(self, record):
+    def to_json(self, record: Dict) -> str:
         try:
             return self.json_lib.dumps(
                 record, default=_json_serializable, ensure_ascii=False
@@ -22,11 +22,11 @@ class JsonLogFormatter(VerboseJSONFormatter):
             except (TypeError, ValueError, OverflowError):
                 return "{}"
 
-    def extra_from_record(self, record) -> Dict:
+    def extra_from_record(self, record: Dict) -> Dict:
         return {"extra": self.sensitive_data_filter(super().extra_from_record(record))}
 
     def sensitive_data_filter(self, data: Dict) -> Dict:
-        def _filter_dict(data: Dict):
+        def _filter_dict(data: Dict) -> Dict:
             new_data = {}
             for k, v in data.items():
                 if k.lower() not in config.LOGGING_SENSITIVE_FIELDS:

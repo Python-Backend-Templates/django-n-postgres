@@ -16,4 +16,4 @@ echo "[COLLECT STATIC]"
 python manage.py collectstatic --no-input
 
 echo "[RUN SERVER]"
-python manage.py runserver 0.0.0.0:"$WSGI_PORT"
+python -m gunicorn config.wsgi:application --bind 0.0.0.0:8000

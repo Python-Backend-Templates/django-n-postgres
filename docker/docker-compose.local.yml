@@ -1,0 +1,41 @@
+services:
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  rabbitmq:
+    extends:
+      file: docker-compose.yml
+      service: rabbitmq
+
+  wsgi:
+    extends:
+      file: docker-compose.yml
+      service: wsgi
+    volumes:
+      - ../src/:/apps/
+
+  celery-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    volumes:
+      - ../src/:/apps/
+
+  celery-beat:
+    extends:
+      file: docker-compose.yml
+      service: celery-beat
+    volumes:
+      - ../src/:/apps/

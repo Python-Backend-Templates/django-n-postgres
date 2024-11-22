@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 
 
 from utils.logging import get_config
@@ -11,7 +12,11 @@ from .celery_config import *  # noqa: F401,F403
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
-
+ENVIRONMENT: Literal["development", "production", "testing"] = (
+    os.environ.get(  # type:ignore[assignment]
+        "ENVIRONMENT", "development"
+    )
+)
 DEBUG = bool(int(os.environ.get("DEBUG", 0)))
 PROD = bool(int(os.environ.get("PROD", 1)))
 TESTING = "pytest" in sys.modules
@@ -22,15 +27,19 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
 ]
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000/"
-]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:8000/"]
 
 USE_X_FORWARDED_HOST = True  # !!! Only behind proxy !!!
 SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
     "https",
 )  # !!! Only behind proxy !!!
+
+if PROD:
+    # Add production domain here
+    CORS_ALLOWED_ORIGINS = []
+else:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Application definition
@@ -40,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     # third party
+    "corsheaders",
     "rest_framework",
     "drf_spectacular",
     "django_celery_results",
@@ -48,23 +58,45 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "utils.middleware.ShowSQLMiddleware",
     "utils.middleware.LogRequestMiddleware",
+    "utils.middleware.RequestIdMiddleware",
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
     ],
-    # "DEFAULT_AUTHENTICATION_CLASSES": ("TODO",),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+    # "DEFAULT_AUTHENTICATION_CLASSES": ("users.backends.JWTAuthentication",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "utils.exceptions.custom_exception_handler",
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "15/second" if PROD else "50/second",
+        "user": "25/second" if PROD else "100/second",
+        # Other scope specific throttles
+    },
 }
+if not PROD:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append(  # type:ignore[attr-defined]
+        "rest_framework.renderers.BrowsableAPIRenderer"
+    )
+
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "API",
@@ -121,12 +153,16 @@ DATABASES = {
 }
 
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{os.environ.get('REDIS_HOST')}:{os.environ.get('REDIS_PORT')}/0",  # noqa: E501
-    },
-}
+if ENVIRONMENT != "testing":
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{os.environ.get('REDIS_HOST')}:{os.environ.get('REDIS_PORT')}/0",  # noqa: E501
+            "OPTIONS": {
+                "PASSWORD": os.environ.get("REDIS_PASSWORD", ""),
+            },
+        },
+    }
 
 
 # AUTH_USER_MODEL = "TODO"
